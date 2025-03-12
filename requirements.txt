@@ -1,0 +1,8 @@
+colorlog==6.9.0
+quart==0.18.4
+quart_schema==0.17.1
+Requests==2.26.0
+requests_html==0.10.0
+wordcloud==1.9.4
+werkzeug==2.2.3
+lxml_html_clean==0.4.1

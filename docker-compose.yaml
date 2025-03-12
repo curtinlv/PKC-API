@@ -1,8 +1,10 @@
 version: '3'
 services:
   pkc-api:
-    image: curtinlv/pkc-api
+    image: curtinlv/pkc-api:latest
     container_name: pkc-api
     ports:
       - "80:80"
+ #   volumes:
+ #     - ./static/pkc.ttf:/app/static/pkc.ttf #词云字体
     restart: unless-stopped
