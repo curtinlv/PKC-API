@@ -1,5 +1,25 @@
 import logging
 import colorlog
+import time
+import sys
+
+def print_header():
+    print("\n" + "="*50, flush=True)
+    print("        ____    __  __     ____  ", flush=True)
+    print("       |  _ \   | |/ /    / ___| ", flush=True)
+    print("       | |_) |  | ' /    | |     ", flush=True)
+    print("       |  __/   | . \    | |____  ", flush=True)
+    print("       |_|      |_|\_\\   |______\ ", flush=True)
+    print("\n" + "=" * 50, flush=True)
+    print("Initializing PKC-API...\n", flush=True)
+print_header()
+def typing_effect(text, delay=0.1):
+    """模拟打字效果"""
+    for char in text:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    print()  # 打印新的一行
 
 class Logger:
     def __init__(self, log_level=logging.DEBUG):
@@ -36,12 +56,13 @@ class Logger:
         return self.logger
 
 # 示例：如何在其他模块中使用这个带颜色的 Logger 类
+# 创建日志实例
+log = Logger(log_level=logging.INFO).get_logger()
 
 # 在需要使用日志的模块中调用 Logger
 if __name__ == '__main__':
     # 创建日志实例
     logger = Logger().get_logger()
-
     # 使用 logger 打印日志
     logger.debug("这是一个调试信息")  # 蓝色
     logger.info("这是一个普通信息")  # 绿色

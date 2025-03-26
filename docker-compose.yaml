@@ -5,6 +5,11 @@ services:
     container_name: pkc-api
     ports:
       - "80:80"
- #   volumes:
+    environment:
+      - apiKey=   #接口密钥，如未配置则每次启动随机生成一个
+      - disableInterfaces=   #禁用的接口，将需要禁用的接口路径填入下面，多个用,分隔。如禁用 抖音视频解析接口，填写 /getDouyinVideo,/getDouyinVideoUrl
+      - sleepNum=5  #解析等待时间，时间越多解析越慢但成功率越大
+    volumes:
+      - ./config.ini:/app/config.ini  #映射配置文件，需手动建立config.ini
  #     - ./static/pkc.ttf:/app/static/pkc.ttf #词云字体
     restart: unless-stopped

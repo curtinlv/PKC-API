@@ -4,6 +4,7 @@ import re, sys, os
 import requests
 import asyncio
 import random
+from utils import kill_chromium_if_long_running, config, log
 
 # 动态生成一个版本号
 def generate_version():
@@ -66,11 +67,7 @@ def getLongURL(url, hd=None):
         new_url = "https://www.douyin.com/video/"+video_id
         # print(f"抖音动态原始链接：{new_url}", flush=True)
         return new_url
-async def save_content_to_file(content, file_path):
-    # 打开文件并写入内容
-    with open(file_path, 'w', encoding='utf-8') as file:
-        file.write(content)
-    print(f"内容已保存到 {file_path}")
+
 async def get_rendered_html(url, max_retries=3, required_content="https://v3-web.douyinvod.com"):
     attempt = 0
     # 配置浏览器参数
@@ -82,32 +79,33 @@ async def get_rendered_html(url, max_retries=3, required_content="https://v3-web
         '--disable-gpu',
         '--window-size=1920x1080'
     ]
-
+    # 启动指定路径的 Chromium
+    # browser = None
+    browser = await launch(
+        executablePath='/usr/bin/chromium' if os.path.exists('/usr/bin/chromium') else None,
+        args=browser_args,
+        headless=True,
+        timeout=60000  # 60秒超时
+    )
+    page = await browser.newPage()
+    await page.setJavaScriptEnabled(True)
+    # await page.setUserAgent(headers['User-Agent'])
+    # 设置页面超时和重试策略
+    page.setDefaultNavigationTimeout(60000)  # 60秒
     while attempt < max_retries:
-        browser = None
         try:
-            is_windows = sys.platform.startswith('win')
-            # 启动指定路径的 Chromium
-            browser = await launch(
-                executablePath=None if is_windows else '/usr/bin/chromium',
-                args=browser_args,
-                headless=True,
-                timeout=60000  # 60秒超时
-            )
-            page = await browser.newPage()
-            await page.setJavaScriptEnabled(True)
-            # await page.setUserAgent(headers['User-Agent'])
-            # 设置页面超时和重试策略
-            page.setDefaultNavigationTimeout(60000)  # 60秒
             # 等待直到所有请求完成
             response = await page.goto(url, {'waitUntil': 'networkidle2'})
             # 等待页面完全加载，包括渲染的内容和异步请求
-            await page.waitFor(5000 + (attempt * 1000))  # 延迟，确保所有脚本执行完毕
+            await page.waitFor((config.sleepNum * 1000) + (attempt * 1000))  # 延迟，确保所有脚本执行完毕
             await auto_scroll(page)  # 滚动页面，加载更多内容
             content = await page.content()
-            # 保存内容到文件
-            # await save_content_to_file(content, file_path=r'/app/111.html')
             if required_content in content:
+                if page:
+                    await page.close()
+                if browser:
+                    await browser.close()
+                kill_chromium_if_long_running()
                 return content
             else:
                 # print(f"未找到, 重试... (Attempt {attempt + 1}/{max_retries})", flush=True)
@@ -115,10 +113,14 @@ async def get_rendered_html(url, max_retries=3, required_content="https://v3-web
         except Exception as e:
             # print(f"发生异常: {str(e)[:200]}, 重试... (Attempt {attempt + 1}/{max_retries})", flush=True)
             attempt += 1
-        finally:
-            if browser:
-                await browser.close()
-
+        # finally:
+        #     if browser:
+        #         await browser.close()
+    if page:
+        await page.close()
+    if browser:
+        await browser.close()
+    kill_chromium_if_long_running()
     return None
 async def auto_scroll(page):
     # 执行页面滚动，直到底部
@@ -140,11 +142,14 @@ async def get_rendered_html_win(url, max_retries=3, required_content="https://v3
             # 发起请求并获取响应
             response = await session.get(url, headers=headers)
             # 执行JavaScript并等待页面加载完成
-            await response.html.arender(timeout=60, sleep=3+attempt, keep_page=True, scrolldown=3)
+            await response.html.arender(timeout=60, sleep=config.sleepNum+attempt, keep_page=True, scrolldown=3)
             # 检查页面内容是否包含指定的字符串
             if required_content in response.html.html:
-                await session.close()
-                return response.html.html
+                html_text = response.html.html
+                if session:
+                    await session.close()
+                kill_chromium_if_long_running()
+                return html_text
             else:
                 # print(f"未找到, 重试... (Attempt {attempt + 1}/{max_retries})", flush=True)
                 attempt += 1
@@ -152,7 +157,9 @@ async def get_rendered_html_win(url, max_retries=3, required_content="https://v3
             # print(f"发生异常: {e}, 重试... (Attempt {attempt + 1}/{max_retries})", flush=True)
             attempt += 1
     # print("未找到，已超出最多尝试次数。", flush=True)
-    await session.close()
+    if session:
+        await session.close()
+    kill_chromium_if_long_running()
     return None
 def extract_url(text):
     # 正则表达式提取src中完整的https://v3-web.douyinvod.com链接
@@ -162,6 +169,34 @@ def extract_url(text):
         return match.group(1)  # 返回匹配到的第一个结果
     else:
         return None
+
+
+def get_seconds_from_html(html_str):
+    # 使用正则表达式提取时间字符串，允许跨行匹配
+    match = re.search(r'<span class="time-duration">([\d:]+)</span>', html_str, re.DOTALL)
+    if match:
+        time_str = match.group(1)  # 获取时间字符串
+        # 分割时间字符串
+        time_parts = time_str.split(':')
+
+        # 根据时间字符串长度处理不同格式
+        if len(time_parts) == 3:  # "HH:MM:SS"
+            hours = int(time_parts[0])
+            minutes = int(time_parts[1])
+            seconds = int(time_parts[2])
+        elif len(time_parts) == 2:  # "MM:SS"
+            hours = 0
+            minutes = int(time_parts[0])
+            seconds = int(time_parts[1])
+        else:
+            return 0
+        # 计算总秒数
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        return total_seconds
+    else:
+        return 0
+
+
 async def main():
     # 使用示例
     url = 'https://www.douyin.com/video/1'
@@ -180,6 +215,17 @@ def run_async():
     finally:
         if loop.is_running():
             loop.close()  # 确保事件循环关闭
+def read_file(file_path):
+    try:
+        # 打开文件并读取内容
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()  # 读取文件的所有内容
+        return content
+    except FileNotFoundError:
+        return f"Error: The file at {file_path} was not found."
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
 
 if __name__ == '__main__':
-    run_async()
+    # run_async()
+    pass

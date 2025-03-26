@@ -6,3 +6,4 @@ requests_html==0.10.0
 wordcloud==1.9.4
 werkzeug==2.2.3
 lxml_html_clean==0.4.1
+psutil == 5.8.0

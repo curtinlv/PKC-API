@@ -1,5 +1,5 @@
 # PKC-API 
-### v1.1.0
+### v1.2.0
 ### API接口名称
 ***    
 - *1.词云分析*
@@ -25,9 +25,14 @@ services:
     image: curtinlv/pkc-api:latest
     container_name: pkc-api
     ports:
-      - "80:80"  # 可改端口，如 8888:80
-#    volumes:
-#      - ./static/pkc.ttf:/app/static/pkc.ttf #词云字体
+      - "80:80"
+    environment:
+      - apiKey=   #接口密钥，如未配置则每次启动随机生成一个
+      - disableInterfaces=   #禁用的接口，将需要禁用的接口路径填入下面，多个用,分隔。如禁用 抖音视频解析接口，填写 /getDouyinVideo,/getDouyinVideoUrl
+      - sleepNum=10  #解析等待时间，时间越多解析越慢但成功率越大
+    volumes:
+      - ./config.ini:/app/config.ini  #映射配置文件config.ini
+ #     - ./static/pkc.ttf:/app/static/pkc.ttf #词云字体
     restart: unless-stopped
 ```
 启动
@@ -50,8 +55,22 @@ python main.py
 # 或
 nohup python main.py >./log.log 2>&1 & #后台启动
 ````
-## Ⅱ.Swagger API调试页面
+## Ⅱ.API调试页面
 ```html
 http://ip/swagger
 ```
 ![swagger.png](swagger.png)
+
+## Ⅲ.更新日志
+~~~
+v1.2.0
+  1、优化抖音解析接口
+  2、新增外挂配置文件 config.ini（可配置自定义端口、apiKey验证、禁用指定接口）
+  3、增加接口apiKey认证（默认临时生成apiKey到控制台，如需配置固定apiKey请编辑配置文件config.ini）
+  
+v1.1.0
+  1、新增抖音解析接口
+
+v1.0.0
+  1、新增词云接口
+~~~

@@ -16,12 +16,14 @@ class dyQuery:
 
 @dataclass
 class dyResp:
+    code: int = 200
+    msg: str = '成功'
     video_url: str = '视频原始链接'
 
 @dataclass
 class ApiErrorResponse:
     code: int = 500
-    error: str = '错误信息'
+    msg: str = '错误信息'
 
 @dataclass
 class ApiSuccessResponse:
